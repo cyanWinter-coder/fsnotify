@@ -92,8 +92,9 @@ FAQ
 No, not unless you are watching the location it was moved to.
 
 ### Are subdirectories watched?
-No, you must add watches for any directory you want to watch (a recursive
-watcher is on the roadmap: [#18]).
+No, you must add watches for any directory you want to watch. `Watcher.AddTree`
+registers a watch on a directory and all of its subdirectories in one
+transactional call (a fully native recursive watcher is on the roadmap: [#18]).
 
 [#18]: https://github.com/fsnotify/fsnotify/issues/18
 

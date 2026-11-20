@@ -1,5 +1,21 @@
 # Changelog
 
+Unreleased
+----------
+
+### New features
+
+- Add `Watcher.AddTree` to recursively watch a directory tree
+  transactionally: either the entire tree is registered or every watch added
+  by the call is rolled back. Supports `WithMaxDepth`, `WithFollowSymlinks`,
+  and `WithIgnore` options.
+
+### Changes and fixes
+
+- inotify: remove watches before closing the fd in Close(), so a recycled fd
+  number can't cause another watcher's watches to be removed.
+
+
 1.10.1 2026-05-04
 -----------------
 

@@ -164,17 +164,21 @@ func (w *inotify) Close() error {
 		return nil
 	}
 
+	// Remove the watches before closing the fd: after close the fd number can
+	// be reused by another watcher, and inotify_rm_watch on the recycled fd
+	// would remove watches from an unrelated inotify instance.
+	w.mu.Lock()
+	for name := range w.watches.path {
+		w.remove(name)
+	}
+	w.mu.Unlock()
+
 	// Causes any blocking reads to return with an error, provided the file
 	// still supports deadline operations.
 	err := w.inotifyFile.Close()
 	if err != nil {
 		return err
 	}
-	w.mu.Lock()
-	for name := range w.watches.path {
-		w.remove(name)
-	}
-	w.mu.Unlock()
 
 	<-w.doneResp // Wait for readEvents() to finish.
 	return nil

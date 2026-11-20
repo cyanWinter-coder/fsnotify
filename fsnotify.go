@@ -30,6 +30,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Watcher watches a set of paths, delivering events on a channel.
@@ -93,6 +94,11 @@ import (
 // events, and often only for some files.
 type Watcher struct {
 	b backend
+
+	// Serializes AddTree against Add, AddWith, Remove, Close, and WatchList,
+	// so that a tree registration is atomic: concurrent calls observe either
+	// the fully registered tree or nothing at all.
+	treeMu sync.Mutex
 
 	// Events sends the filesystem change events.
 	//
@@ -283,7 +289,11 @@ func NewBufferedWatcher(sz uint) (*Watcher, error) {
 //
 // Watch the parent directory and use Event.Name to filter out files you're not
 // interested in. There is an example of this in cmd/fsnotify/file.go.
-func (w *Watcher) Add(path string) error { return w.b.Add(path) }
+func (w *Watcher) Add(path string) error {
+	w.treeMu.Lock()
+	defer w.treeMu.Unlock()
+	return w.b.Add(path)
+}
 
 // AddWith is like [Watcher.Add], but allows adding options. When using Add()
 // the defaults described below are used.
@@ -292,7 +302,11 @@ func (w *Watcher) Add(path string) error { return w.b.Add(path) }
 //
 //   - [WithBufferSize] sets the buffer size for the Windows backend; no-op on
 //     other platforms. The default is 64K (65536 bytes).
-func (w *Watcher) AddWith(path string, opts ...addOpt) error { return w.b.AddWith(path, opts...) }
+func (w *Watcher) AddWith(path string, opts ...addOpt) error {
+	w.treeMu.Lock()
+	defer w.treeMu.Unlock()
+	return w.b.AddWith(path, opts...)
+}
 
 // Remove stops monitoring the path for changes.
 //
@@ -302,17 +316,29 @@ func (w *Watcher) AddWith(path string, opts ...addOpt) error { return w.b.AddWit
 // Removing a path that has not yet been added returns [ErrNonExistentWatch].
 //
 // Returns nil if [Watcher.Close] was called.
-func (w *Watcher) Remove(path string) error { return w.b.Remove(path) }
+func (w *Watcher) Remove(path string) error {
+	w.treeMu.Lock()
+	defer w.treeMu.Unlock()
+	return w.b.Remove(path)
+}
 
 // Close removes all watches and closes the Events channel.
-func (w *Watcher) Close() error { return w.b.Close() }
+func (w *Watcher) Close() error {
+	w.treeMu.Lock()
+	defer w.treeMu.Unlock()
+	return w.b.Close()
+}
 
 // WatchList returns all paths explicitly added with [Watcher.Add] (and are not
 // yet removed).
 //
 // The order is undefined, and may differ per call. Returns nil if
 // [Watcher.Close] was called.
-func (w *Watcher) WatchList() []string { return w.b.WatchList() }
+func (w *Watcher) WatchList() []string {
+	w.treeMu.Lock()
+	defer w.treeMu.Unlock()
+	return w.b.WatchList()
+}
 
 // Supports reports if all the listed operations are supported by this platform.
 //
